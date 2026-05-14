@@ -6,8 +6,9 @@ Entry point for the FastAPI application.
 import logging
 import time
 import os
+import shutil
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -129,3 +130,36 @@ async def health_check():
             "environment": ENVIRONMENT,
         },
     )
+
+
+@app.post("/upload", tags=["Upload"], summary="Upload a PDF file")
+async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Accepts a PDF file and saves it temporarily to the data/raw directory.
+    """
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    # Resolve project root (rag-knowledge-base) relative to this file (app/main.py)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    raw_data_dir = os.path.join(base_dir, "data", "raw")
+    
+    os.makedirs(raw_data_dir, exist_ok=True)
+    
+    file_path = os.path.join(raw_data_dir, file.filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error(f"Failed to upload file {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+    finally:
+        file.file.close()
+        
+    return {
+        "message": "File uploaded successfully",
+        "filename": file.filename,
+        "path": file_path
+    }
+
