@@ -8,11 +8,17 @@ import time
 import os
 import shutil
 
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+import pdfplumber
+
+from services.vector_store import VectorDatabase
+from services.embedder import TextEmbedder
+from services.text_chunker import chunk_text
+from services.llm_service import LLMService
 
 # ---------------------------------------------------------------------------
 # Environment & Logging
@@ -34,6 +40,13 @@ APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+
+# ---------------------------------------------------------------------------
+# Global Services
+# ---------------------------------------------------------------------------
+vector_db = VectorDatabase(embedding_dimension=384, persist_dir="data/vector_store")
+embedder = TextEmbedder(model_name="all-MiniLM-L6-v2")
+llm_service = LLMService(vector_db=vector_db, embedder=embedder)
 
 # ---------------------------------------------------------------------------
 # FastAPI Instance
@@ -90,11 +103,17 @@ async def log_requests(request: Request, call_next):
 @app.on_event("startup")
 async def on_startup():
     logger.info("🚀 %s v%s starting up in [%s] mode", APP_NAME, APP_VERSION, ENVIRONMENT)
-
+    # Try to load existing vectors on startup
+    if vector_db.load_from_disk():
+        logger.info(f"Loaded existing vector database with {vector_db.get_total_items()} items.")
+    else:
+        logger.info("No existing vector database found. Starting fresh.")
 
 @app.on_event("shutdown")
 async def on_shutdown():
     logger.info("🛑 %s shutting down", APP_NAME)
+    vector_db.save_to_disk()
+    logger.info("Vector database saved to disk.")
 
 
 # ---------------------------------------------------------------------------
@@ -132,10 +151,11 @@ async def health_check():
     )
 
 
-@app.post("/upload", tags=["Upload"], summary="Upload a PDF file")
+@app.post("/upload", tags=["Upload"], summary="Upload and process a PDF file")
 async def upload_pdf(file: UploadFile = File(...)):
     """
-    Accepts a PDF file and saves it temporarily to the data/raw directory.
+    Accepts a PDF file, extracts text, chunks it, generates embeddings, 
+    and saves to the vector database.
     """
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
@@ -145,21 +165,73 @@ async def upload_pdf(file: UploadFile = File(...)):
     raw_data_dir = os.path.join(base_dir, "data", "raw")
     
     os.makedirs(raw_data_dir, exist_ok=True)
-    
     file_path = os.path.join(raw_data_dir, file.filename)
     
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        logger.error(f"Failed to upload file {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+        logger.error(f"Failed to save file {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
     finally:
         file.file.close()
+
+    # Process the PDF
+    try:
+        chunks_to_embed = []
+        metadata_list = []
+        
+        with pdfplumber.open(file_path) as pdf:
+            for page_num, page in enumerate(pdf.pages, start=1):
+                text = page.extract_text()
+                if text:
+                    # Break the page text into smaller chunks
+                    page_chunks = chunk_text(text, chunk_size=1000, overlap=200)
+                    for chunk in page_chunks:
+                        chunks_to_embed.append(chunk)
+                        metadata_list.append({
+                            "text": chunk,
+                            "filename": file.filename,
+                            "page_number": page_num
+                        })
+        
+        # Generate embeddings
+        if chunks_to_embed:
+            embeddings = embedder.turn_chunks_into_embeddings(chunks_to_embed)
+            # Add to database
+            vector_db.add_embeddings(embeddings, metadata_list)
+            # Save right away so we don't lose data if the server crashes
+            vector_db.save_to_disk()
+            
+    except Exception as e:
+        logger.error(f"Failed to process PDF {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
         
     return {
-        "message": "File uploaded successfully",
+        "message": "File processed and added to knowledge base successfully",
         "filename": file.filename,
-        "path": file_path
+        "chunks_added": len(chunks_to_embed),
+        "total_knowledge_base_size": vector_db.get_total_items()
     }
+
+
+@app.post("/ask", tags=["Q&A"], summary="Ask a question")
+async def ask_question(
+    query: str = Body(..., embed=True),
+    session_id: str = Body("default", embed=True)
+):
+    """
+    Ask a question against the knowledge base.
+    Uses RAG (Retrieval-Augmented Generation) to find relevant context
+    and generate an answer using the LLM.
+    """
+    if not query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+    try:
+        result = llm_service.ask_question(query=query, session_id=session_id)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to process query: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating answer: {str(e)}")
 

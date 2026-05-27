@@ -3,6 +3,9 @@ uvicorn[standard]
 python-dotenv
 python-multipart
 pdfplumber
-l a n g c h a i n - t e x t - s p l i t t e r s  
-sentence-transformers  
- 
+langchain-text-splitters
+sentence-transformers
+langchain
+langchain-community
+langchain-google-genai
+faiss-cpu
