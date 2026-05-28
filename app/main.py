@@ -8,12 +8,16 @@ import time
 import os
 import shutil
 
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Body, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import pdfplumber
+from datetime import timedelta
+
+from app.auth import get_current_user, create_access_token, verify_password, TEST_USER, ACCESS_TOKEN_EXPIRE_MINUTES
 
 from services.vector_store import VectorDatabase
 from services.embedder import TextEmbedder
@@ -151,8 +155,28 @@ async def health_check():
     )
 
 
+@app.post("/login", tags=["Auth"], summary="Login to get JWT token")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    # Check if the user exists and password is correct
+    if form_data.username != TEST_USER["username"] or not verify_password(form_data.password, TEST_USER["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": form_data.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @app.post("/upload", tags=["Upload"], summary="Upload and process a PDF file")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(
+    file: UploadFile = File(...),
+    current_user: str = Depends(get_current_user)
+):
     """
     Accepts a PDF file, extracts text, chunks it, generates embeddings, 
     and saves to the vector database.
@@ -196,14 +220,18 @@ async def upload_pdf(file: UploadFile = File(...)):
                         })
         
         # Generate embeddings
-        if chunks_to_embed:
-            embeddings = embedder.turn_chunks_into_embeddings(chunks_to_embed)
-            # Add to database
-            vector_db.add_embeddings(embeddings, metadata_list)
-            # Save right away so we don't lose data if the server crashes
-            vector_db.save_to_disk()
+        if not chunks_to_embed:
+            raise HTTPException(status_code=400, detail="Could not extract any text from the provided PDF file.")
             
-    except Exception as e:
+        embeddings = embedder.turn_chunks_into_embeddings(chunks_to_embed)
+        # Add to database
+        vector_db.add_embeddings(embeddings, metadata_list)
+        # Save right away so we don't lose data if the server crashes
+        vector_db.save_to_disk()
+            
+    except HTTPException:
+        # Re-raise HTTP exceptions so they return proper status codes to the client
+        raise
         logger.error(f"Failed to process PDF {file.filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
         
@@ -218,7 +246,8 @@ async def upload_pdf(file: UploadFile = File(...)):
 @app.post("/ask", tags=["Q&A"], summary="Ask a question")
 async def ask_question(
     query: str = Body(..., embed=True),
-    session_id: str = Body("default", embed=True)
+    session_id: str = Body("default", embed=True),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Ask a question against the knowledge base.
@@ -232,6 +261,31 @@ async def ask_question(
         result = llm_service.ask_question(query=query, session_id=session_id)
         return result
     except Exception as e:
-        logger.error(f"Failed to process query: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating answer: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Failed to process query: {error_msg}")
+        if "LLM_API_UNAVAILABLE" in error_msg:
+            raise HTTPException(status_code=503, detail="The AI service is currently unavailable. Please try again later.")
+        elif "LLM_API_QUOTA" in error_msg:
+            raise HTTPException(status_code=429, detail="The AI service quota has been exceeded. Please try again later.")
+        raise HTTPException(status_code=500, detail=f"Error generating answer: {error_msg}")
+
+from fastapi.responses import StreamingResponse
+
+@app.post("/ask/stream", tags=["Q&A"], summary="Ask a question and stream response")
+async def ask_question_stream_endpoint(
+    query: str = Body(..., embed=True),
+    session_id: str = Body("default", embed=True),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Ask a question against the knowledge base and stream the answer token by token.
+    Uses Server-Sent Events (SSE) format.
+    """
+    if not query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+    return StreamingResponse(
+        llm_service.ask_question_stream(query=query, session_id=session_id),
+        media_type="text/event-stream"
+    )
 

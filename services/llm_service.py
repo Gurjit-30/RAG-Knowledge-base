@@ -125,10 +125,21 @@ class LLMService:
         Returns the answer and the sources used.
         """
         # Run the chain!
-        response = self.qa_chain.invoke(
-            {"input": query},
-            config={"configurable": {"session_id": session_id}}
-        )
+        try:
+            response = self.qa_chain.invoke(
+                {"input": query},
+                config={"configurable": {"session_id": session_id}}
+            )
+        except Exception as api_err:
+            # Check for common API connectivity or quota errors (e.g., 503, 429)
+            err_msg = str(api_err).lower()
+            if "503" in err_msg or "unavailable" in err_msg:
+                raise Exception("LLM_API_UNAVAILABLE: The AI service is currently down or unreachable (503). Please try again later.")
+            elif "429" in err_msg or "quota" in err_msg:
+                raise Exception("LLM_API_QUOTA: The AI service quota has been exceeded (429).")
+            else:
+                # Re-raise generic errors
+                raise api_err
         
         # Extract the answer
         answer = response.get("answer", "I don't know.")
@@ -149,3 +160,58 @@ class LLMService:
             "answer": answer,
             "sources": sources
         }
+
+    async def ask_question_stream(self, query: str, session_id: str = "default"):
+        """
+        Stream the AI's response token by token, along with sources.
+        Yields JSON strings that can be sent over Server-Sent Events (SSE).
+        """
+        # We use astream_events to get the streaming tokens
+        # The chain might emit different types of events. We care about "on_chat_model_stream"
+        # We also want to capture the retrieved context at the end or beginning.
+        
+        sources_yielded = False
+        
+        try:
+            async for event in self.qa_chain.astream_events(
+                {"input": query},
+                config={"configurable": {"session_id": session_id}},
+                version="v1"
+            ):
+                kind = event["event"]
+                
+                # Intercept the retriever output to extract sources
+                if kind == "on_retriever_end":
+                    docs = event["data"].get("output", [])
+                    if docs and not sources_yielded:
+                        sources = []
+                        for doc in docs:
+                            meta = doc.metadata
+                            source_entry = {
+                                "filename": meta.get("filename", "Unknown"),
+                                "page_number": meta.get("page_number", "Unknown")
+                            }
+                            if source_entry not in sources:
+                                sources.append(source_entry)
+                        
+                        import json
+                        yield json.dumps({"type": "sources", "data": sources}) + "\n"
+                        sources_yielded = True
+
+                # Intercept the LLM token stream
+                elif kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if chunk.content:
+                        import json
+                        yield json.dumps({"type": "token", "data": chunk.content}) + "\n"
+                        
+        except Exception as api_err:
+            import json
+            err_msg = str(api_err).lower()
+            if "503" in err_msg or "unavailable" in err_msg:
+                yield json.dumps({"type": "error", "data": "LLM_API_UNAVAILABLE: The AI service is currently down."}) + "\n"
+            elif "429" in err_msg or "quota" in err_msg:
+                yield json.dumps({"type": "error", "data": "LLM_API_QUOTA: The AI service quota has been exceeded."}) + "\n"
+            else:
+                yield json.dumps({"type": "error", "data": f"Error generating answer: {str(api_err)}"}) + "\n"
+
