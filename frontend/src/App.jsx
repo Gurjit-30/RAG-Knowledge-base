@@ -46,23 +46,31 @@ function App() {
       
       <main className="flex-1 flex flex-col relative">
         {/* Top Header */}
-        <header className="h-16 border-b border-dark-700 bg-dark-900/80 backdrop-blur-md flex items-center justify-between px-6 z-10">
-          <h1 className="font-semibold text-lg">
-            {view === 'chat' ? 'Conversation' : 'Knowledge Base Upload'}
-          </h1>
-          <div className="flex bg-dark-800 p-1 rounded-lg">
+        <header className="h-20 border-b border-white/5 bg-dark-900/40 backdrop-blur-xl flex items-center justify-between px-8 z-10 shadow-sm relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-transparent opacity-50 pointer-events-none"></div>
+          
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.4)]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <h1 className="font-display font-bold text-2xl tracking-tight text-gradient">
+              {view === 'chat' ? 'Nexus AI Assistant' : 'Knowledge Base Upload'}
+            </h1>
+          </div>
+
+          <div className="flex bg-dark-800/80 p-1.5 rounded-xl border border-white/5 backdrop-blur-md relative z-10">
             <button 
               onClick={() => setView('chat')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                view === 'chat' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                view === 'chat' ? 'bg-primary-600 text-white shadow-[0_4px_12px_rgba(139,92,246,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
               }`}
             >
               Chat
             </button>
             <button 
               onClick={() => setView('upload')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                view === 'upload' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                view === 'upload' ? 'bg-primary-600 text-white shadow-[0_4px_12px_rgba(139,92,246,0.3)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
               }`}
             >
               Upload
