@@ -19,9 +19,6 @@ function App() {
     }
   }, [token]);
 
-  if (!token) {
-    return <Login onLogin={setToken} />;
-  }
 
   const handleLogout = () => {
     setToken(null);

@@ -174,8 +174,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @app.post("/upload", tags=["Upload"], summary="Upload and process a PDF file")
 async def upload_pdf(
-    file: UploadFile = File(...),
-    current_user: str = Depends(get_current_user)
+    file: UploadFile = File(...)
 ):
     """
     Accepts a PDF file, extracts text, chunks it, generates embeddings, 
@@ -246,8 +245,7 @@ async def upload_pdf(
 @app.post("/ask", tags=["Q&A"], summary="Ask a question")
 async def ask_question(
     query: str = Body(..., embed=True),
-    session_id: str = Body("default", embed=True),
-    current_user: str = Depends(get_current_user)
+    session_id: str = Body("default", embed=True)
 ):
     """
     Ask a question against the knowledge base.
@@ -274,8 +272,7 @@ from fastapi.responses import StreamingResponse
 @app.post("/ask/stream", tags=["Q&A"], summary="Ask a question and stream response")
 async def ask_question_stream_endpoint(
     query: str = Body(..., embed=True),
-    session_id: str = Body("default", embed=True),
-    current_user: str = Depends(get_current_user)
+    session_id: str = Body("default", embed=True)
 ):
     """
     Ask a question against the knowledge base and stream the answer token by token.
