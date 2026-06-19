@@ -49,7 +49,7 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 # Global Services
 # ---------------------------------------------------------------------------
 vector_db = VectorDatabase(embedding_dimension=768, persist_dir="data/vector_store")
-embedder = TextEmbedder(model_name="models/text-embedding-004")
+embedder = TextEmbedder(model_name="models/embedding-001")
 llm_service = LLMService(vector_db=vector_db, embedder=embedder)
 
 # ---------------------------------------------------------------------------

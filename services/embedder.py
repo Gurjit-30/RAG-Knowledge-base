@@ -11,7 +11,7 @@ class TextEmbedder:
     This saves massive amounts of memory compared to running a local PyTorch model!
     """
     
-    def __init__(self, model_name: str = 'models/text-embedding-004'):
+    def __init__(self, model_name: str = 'models/embedding-001'):
         logger.info(f"Connecting to Gemini API for embeddings using model '{model_name}'...")
         # Get the API key from environment
         api_key = os.getenv("GOOGLE_API_KEY")
