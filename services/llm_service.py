@@ -57,9 +57,9 @@ class LLMService:
     """
     
     def __init__(self, vector_db: VectorDatabase, embedder: TextEmbedder):
-        # We'll use Gemini 1.5 Flash as our core model
+        # We'll use Gemini 2.5 Flash as our core model
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             temperature=0.3
         )
         
