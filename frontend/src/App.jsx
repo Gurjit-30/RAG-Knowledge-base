@@ -71,18 +71,18 @@ function App() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden">
-          {view === 'chat' ? (
+        <div className="flex-1 overflow-hidden relative">
+          <div className={`absolute inset-0 ${view === 'chat' ? 'flex flex-col' : 'hidden'}`}>
             <ChatInterface token={token} sessionId={currentSessionId} />
-          ) : (
-            <div className="h-full overflow-y-auto p-6 flex flex-col pt-12">
-              <div className="text-center mb-8 animate-fade-in-up">
-                <h2 className="text-3xl font-bold text-white mb-2">Enhance Knowledge Base</h2>
-                <p className="text-slate-400">Upload PDF documents to expand the AI's understanding.</p>
-              </div>
-              <FileUpload token={token} />
+          </div>
+          
+          <div className={`absolute inset-0 overflow-y-auto p-6 flex flex-col pt-12 bg-dark-900 ${view === 'upload' ? 'flex' : 'hidden'}`}>
+            <div className="text-center mb-8 animate-fade-in-up">
+              <h2 className="text-3xl font-bold text-white mb-2">Enhance Knowledge Base</h2>
+              <p className="text-slate-400">Upload PDF documents to expand the AI's understanding.</p>
             </div>
-          )}
+            <FileUpload token={token} />
+          </div>
         </div>
       </main>
     </div>

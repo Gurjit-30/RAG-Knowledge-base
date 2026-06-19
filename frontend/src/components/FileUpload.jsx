@@ -68,10 +68,6 @@ export default function FileUpload({ token }) {
       
       setStatus('success');
       setMessage(`Successfully processed ${response.data.chunks_added} chunks!`);
-      setTimeout(() => {
-        setFile(null);
-        setStatus('idle');
-      }, 3000);
     } catch (error) {
       setStatus('error');
       setMessage(error.response?.data?.detail || 'Upload failed');
@@ -171,6 +167,24 @@ export default function FileUpload({ token }) {
           >
             <UploadCloud size={20} />
             Upload Document
+          </button>
+        </div>
+      )}
+      
+      {/* Success Next Steps Button */}
+      {status === 'success' && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => {
+              setFile(null);
+              setStatus('idle');
+              setMessage('');
+              setUploadProgress(0);
+            }}
+            className="glass-button px-8 py-3 rounded-xl font-medium flex items-center gap-2"
+          >
+            <File size={20} />
+            Upload Another Document
           </button>
         </div>
       )}
