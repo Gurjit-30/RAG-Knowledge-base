@@ -184,8 +184,21 @@ class LLMService:
                 if kind == "on_retriever_end":
                     docs = event["data"].get("output", [])
                     if docs and not sources_yielded:
+                        # Langchain might return a dict or string depending on the exact node triggering this event
+                        if isinstance(docs, dict):
+                            # Try to find the documents in common dictionary keys
+                            docs = docs.get("documents", docs.get("context", []))
+                            
+                        # If docs is a string or somehow not an iterable of documents, skip it
+                        if not isinstance(docs, list):
+                            docs = []
+                            
                         sources = []
                         for doc in docs:
+                            # Safely check if it has metadata (skip if it's just a string)
+                            if not hasattr(doc, "metadata"):
+                                continue
+                                
                             meta = doc.metadata
                             source_entry = {
                                 "filename": meta.get("filename", "Unknown"),
@@ -194,9 +207,11 @@ class LLMService:
                             if source_entry not in sources:
                                 sources.append(source_entry)
                         
-                        import json
-                        yield json.dumps({"type": "sources", "data": sources}) + "\n"
-                        sources_yielded = True
+                        # Only yield if we actually found sources
+                        if sources:
+                            import json
+                            yield json.dumps({"type": "sources", "data": sources}) + "\n"
+                            sources_yielded = True
 
                 # Intercept the LLM token stream
                 elif kind == "on_chat_model_stream":
