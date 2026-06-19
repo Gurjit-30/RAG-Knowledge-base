@@ -34,6 +34,14 @@ class VectorDatabase:
             
         vectors_to_add = np.array(embeddings).astype('float32')
         
+        # If the new embeddings don't match our index dimension, we must reset the index
+        # (e.g. if we switched from a 384-dim local model to a 768-dim Gemini model)
+        if self.index.d != vectors_to_add.shape[1]:
+            print(f"Dimension mismatch (index:{self.index.d} vs embeddings:{vectors_to_add.shape[1]}). Resetting vector database.")
+            self.embedding_dimension = vectors_to_add.shape[1]
+            self.index = faiss.IndexFlatL2(self.embedding_dimension)
+            self.chunk_map = {}
+        
         start_id = self.index.ntotal
         self.index.add(vectors_to_add)
         
