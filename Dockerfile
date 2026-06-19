@@ -21,10 +21,5 @@ RUN mkdir -p /app/data/vector_store /app/data/raw
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV PORT=8000
-
-# Expose port
-EXPOSE 8000
-
-# Run the FastAPI application
-CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+# Run the FastAPI application using Render's dynamically injected PORT
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
