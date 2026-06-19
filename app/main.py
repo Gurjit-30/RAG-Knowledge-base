@@ -232,8 +232,10 @@ async def upload_pdf(
         # Re-raise HTTP exceptions so they return proper status codes to the client
         raise
     except Exception as e:
-        logger.error(f"Failed to process PDF {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
+        import traceback
+        err_msg = repr(e) + "\n" + traceback.format_exc()
+        logger.error(f"Failed to process PDF {file.filename}: {err_msg}")
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {err_msg}")
         
     return {
         "message": "File processed and added to knowledge base successfully",
