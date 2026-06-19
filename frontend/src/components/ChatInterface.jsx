@@ -29,7 +29,8 @@ export default function ChatInterface({ token, sessionId }) {
 
     try {
       // Setup the fetch request to our streaming endpoint
-      const response = await fetch('http://localhost:8000/ask/stream', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/ask/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

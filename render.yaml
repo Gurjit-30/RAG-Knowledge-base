@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: rag-knowledge-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: GOOGLE_API_KEY
+        sync: false # You will input this manually in the Render Dashboard
+      - key: SECRET_KEY
+        sync: false # You will input this manually in the Render Dashboard
+      - key: ALLOWED_ORIGINS
+        sync: false # E.g., https://your-vercel-app.vercel.app
