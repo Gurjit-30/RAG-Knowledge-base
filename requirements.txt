@@ -6,6 +6,7 @@ pdfplumber
 langchain-text-splitters
 
 langchain
+langchain-classic
 langchain-community
 langchain-google-genai
 faiss-cpu
