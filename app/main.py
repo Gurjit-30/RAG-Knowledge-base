@@ -231,6 +231,7 @@ async def upload_pdf(
     except HTTPException:
         # Re-raise HTTP exceptions so they return proper status codes to the client
         raise
+    except Exception as e:
         logger.error(f"Failed to process PDF {file.filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
         
