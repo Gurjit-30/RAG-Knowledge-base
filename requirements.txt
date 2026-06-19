@@ -4,7 +4,7 @@ python-dotenv
 python-multipart
 pdfplumber
 langchain-text-splitters
-sentence-transformers
+
 langchain
 langchain-community
 langchain-google-genai

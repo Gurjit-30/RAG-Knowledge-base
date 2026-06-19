@@ -48,8 +48,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 # ---------------------------------------------------------------------------
 # Global Services
 # ---------------------------------------------------------------------------
-vector_db = VectorDatabase(embedding_dimension=384, persist_dir="data/vector_store")
-embedder = TextEmbedder(model_name="all-MiniLM-L6-v2")
+vector_db = VectorDatabase(embedding_dimension=768, persist_dir="data/vector_store")
+embedder = TextEmbedder(model_name="models/text-embedding-004")
 llm_service = LLMService(vector_db=vector_db, embedder=embedder)
 
 # ---------------------------------------------------------------------------
